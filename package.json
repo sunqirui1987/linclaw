@@ -1,0 +1,16 @@
+{
+  "name": "open-wizard",
+  "version": "1.0.0",
+  "description": "OpenClaw 安装引导与管理工具",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"pnpm dev:backend\" \"pnpm dev:frontend\"",
+    "dev:backend": "pnpm -C backend dev",
+    "dev:frontend": "pnpm -C frontend dev",
+    "build": "pnpm -C frontend build",
+    "start": "pnpm -C backend start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
