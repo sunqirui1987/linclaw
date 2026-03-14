@@ -1,0 +1,140 @@
+name: Bug Report
+description: 报告 LinClaw 在 Web、Go 服务、Gateway 或发布包中的问题
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈问题。
+
+        现在的 LinClaw 已经是 `Web + Go` 架构。为了尽快定位问题，请尽量补充启动方式、运行命令、日志和复现路径。
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 问题模块
+      description: 这次问题主要发生在哪一层？
+      options:
+        - 启动 / 部署
+        - Gateway / 服务控制
+        - 配置 / openclaw.json
+        - 模型 / Agent / 渠道
+        - 前端页面 / 交互
+        - 远程实例
+        - 发布包 / GitHub Release
+        - 其他
+    validations:
+      required: true
+
+  - type: dropdown
+    id: run_mode
+    attributes:
+      label: 运行方式
+      description: 你是怎么启动 LinClaw 的？
+      options:
+        - npm run dev
+        - npm run serve
+        - ./linclawd
+        - deploy.sh 安装
+        - GitHub Release 解压后启动
+        - Docker / 容器环境
+        - 远程实例接入
+        - 其他
+    validations:
+      required: true
+
+  - type: input
+    id: command
+    attributes:
+      label: 实际启动命令
+      description: 尽量填你执行的完整命令。
+      placeholder: 例如：npm run serve / ./linclawd --host 0.0.0.0 --port 1420 --web-root dist
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 清楚描述你看到了什么错误，最好包含完整报错。
+      placeholder: 例如：点击“启动 Gateway”后提示 GATEWAY_NOT_READY...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 按顺序写清楚是怎么触发的。
+      placeholder: |
+        1. 运行 ...
+        2. 进入 ...
+        3. 点击 ...
+        4. 看到报错 ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望结果
+      placeholder: 我原本期望 ...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: LinClaw 版本
+      description: 可在“关于”页面或发布包文件名中查看。
+      placeholder: 例如：0.8.0
+    validations:
+      required: true
+
+  - type: input
+    id: openclaw_version
+    attributes:
+      label: OpenClaw 版本
+      description: 如果知道，请填写 `openclaw --version` 的结果。
+      placeholder: 例如：openclaw 1.2.3
+    validations:
+      required: false
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Windows 11
+        - Windows 10
+        - Ubuntu / Debian
+        - Fedora / RHEL
+        - Arch Linux
+        - 其他 Linux
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 截图 / 配置片段
+      description: 建议附上报错截图、LinClaw 日志、Gateway 日志，或脱敏后的配置片段。
+      placeholder: |
+        - UI 报错
+        - ~/.openclaw/logs/*
+        - openclaw.json 相关片段
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 补充信息
+      placeholder: 例如：是否走代理、是否是远程实例、是否刚做过升级/迁移
+    validations:
+      required: false

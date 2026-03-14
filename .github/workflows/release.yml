@@ -1,0 +1,197 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 发布标签，例如 v0.8.0
+        required: true
+        type: string
+      targets:
+        description: 可选，发布目标，留空表示默认全部
+        required: false
+        type: string
+        default: ""
+      prerelease:
+        description: 是否标记为预发布
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Build And Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: src-go/go.mod
+          cache-dependency-path: src-go/go.sum
+
+      - name: Ensure archive tools are available
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zip
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+            PRERELEASE="${{ github.event.inputs.prerelease }}"
+            TARGETS_INPUT="${{ github.event.inputs.targets }}"
+          else
+            TAG_NAME="${{ github.ref_name }}"
+            PRERELEASE="false"
+            TARGETS_INPUT=""
+          fi
+
+          VERSION="${TAG_NAME#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$PKG_VERSION" != "$VERSION" ]; then
+            echo "package.json version ($PKG_VERSION) does not match tag ($VERSION)" >&2
+            exit 1
+          fi
+
+          RELEASE_DIR="${RUNNER_TEMP}/linclaw-release/v${VERSION}"
+
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "release_dir=$RELEASE_DIR" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+          {
+            echo "targets_input<<EOF"
+            echo "$TARGETS_INPUT"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build release assets
+        shell: bash
+        env:
+          LINCLAW_RELEASE_DIR: ${{ steps.meta.outputs.release_dir }}
+          TARGETS_INPUT: ${{ steps.meta.outputs.targets_input }}
+        run: |
+          if [ -n "$TARGETS_INPUT" ]; then
+            npm run release -- $TARGETS_INPUT
+          else
+            npm run release
+          fi
+
+      - name: Build release notes
+        id: notes
+        shell: bash
+        env:
+          TAG_NAME: ${{ steps.meta.outputs.tag_name }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          RELEASE_DIR: ${{ steps.meta.outputs.release_dir }}
+          REPO: ${{ github.repository }}
+        run: |
+          PREV_TAG="$(git tag --sort=-v:refname | grep -E '^v' | grep -vx "$TAG_NAME" | head -n 1 || true)"
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="${PREV_TAG}..HEAD"
+          else
+            RANGE=""
+          fi
+
+          {
+            echo "## LinClaw ${TAG_NAME}"
+            echo
+            echo "- 发布形态：Web + Go 单二进制 (`linclawd`) + 前端静态资源"
+            echo "- 产物来源：GitHub Actions 调用 \`scripts/release.sh\` 自动构建"
+            echo "- 校验文件：\`SHA256SUMS\`"
+            echo
+            echo "### 快速启动"
+            echo
+            echo "- macOS / Linux：解压后执行 \`./start.sh\`"
+            echo "- Windows：解压后执行 \`start.cmd\`"
+            echo "- 自定义端口：设置 \`LINCLAW_PORT\`"
+            echo
+            echo "### 资产清单"
+            echo
+            find "$RELEASE_DIR" -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name 'SHA256SUMS' \) -printf -- '- `%f`\n' | sort
+            echo
+            echo "### 变更摘要"
+            echo
+            if [ -n "$RANGE" ]; then
+              git log "$RANGE" --pretty=format:'- %s' --no-merges | head -n 20
+            else
+              git log --pretty=format:'- %s' --no-merges -n 20
+            fi
+            echo
+            echo "### 部署提示"
+            echo
+            echo "- 需要目标机器本地可用的 OpenClaw Gateway（默认端口 18789）"
+            echo "- 源码部署可直接执行 \`curl -fsSL https://raw.githubusercontent.com/${REPO}/main/deploy.sh | bash\`"
+          } > "$RUNNER_TEMP/release-notes.md"
+
+          echo "notes_file=$RUNNER_TEMP/release-notes.md" >> "$GITHUB_OUTPUT"
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linclaw-${{ steps.meta.outputs.version }}-release
+          path: |
+            ${{ steps.meta.outputs.release_dir }}/*.tar.gz
+            ${{ steps.meta.outputs.release_dir }}/*.zip
+            ${{ steps.meta.outputs.release_dir }}/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ steps.meta.outputs.tag_name }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          RELEASE_DIR: ${{ steps.meta.outputs.release_dir }}
+          NOTES_FILE: ${{ steps.notes.outputs.notes_file }}
+          PRERELEASE: ${{ steps.meta.outputs.prerelease }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          mapfile -t ASSETS < <(find "$RELEASE_DIR" -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name 'SHA256SUMS' \) | sort)
+          if [ "${#ASSETS[@]}" -eq 0 ]; then
+            echo "No release assets found in $RELEASE_DIR" >&2
+            exit 1
+          fi
+
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" "${ASSETS[@]}" --clobber
+            gh release edit "$TAG_NAME" --title "LinClaw ${TAG_NAME}" --notes-file "$NOTES_FILE"
+          else
+            EXTRA_ARGS=()
+            if [ "$PRERELEASE" = "true" ]; then
+              EXTRA_ARGS+=(--prerelease)
+            fi
+            gh release create "$TAG_NAME" "${ASSETS[@]}" \
+              --target "$TARGET_SHA" \
+              --title "LinClaw ${TAG_NAME}" \
+              --notes-file "$NOTES_FILE" \
+              "${EXTRA_ARGS[@]}"
+          fi

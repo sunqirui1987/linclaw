@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify (Ubuntu)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: src-go/go.mod
+          cache-dependency-path: src-go/go.sum
+
+      - name: Ensure zip is available
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zip
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Run Go tests
+        run: go test ./src-go/...
+
+      - name: Build linclawd
+        run: go build ./src-go/cmd/linclawd
+
+      - name: Smoke current-platform package
+        env:
+          LINCLAW_BUILD_DIR: ${{ runner.temp }}/linclaw-build
+        run: bash build.sh
+
+      - name: Smoke release packaging
+        env:
+          LINCLAW_RELEASE_DIR: ${{ runner.temp }}/linclaw-release
+        run: npm run release -- linux/amd64 windows/amd64
+
+      - name: Upload release smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-smoke
+          path: |
+            ${{ runner.temp }}/linclaw-release/*.tar.gz
+            ${{ runner.temp }}/linclaw-release/*.zip
+            ${{ runner.temp }}/linclaw-release/SHA256SUMS
+          if-no-files-found: ignore
+          retention-days: 7
+
+  platform-smoke:
+    name: Platform Smoke (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+          - name: Windows
+            os: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: src-go/go.mod
+          cache-dependency-path: src-go/go.sum
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Run Go tests
+        run: go test ./src-go/...
+
+      - name: Build linclawd
+        run: go build ./src-go/cmd/linclawd

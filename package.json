@@ -1,16 +1,40 @@
 {
-  "name": "open-wizard",
-  "version": "1.0.0",
-  "description": "OpenClaw 安装引导与管理工具",
+  "name": "linclaw",
+  "version": "0.8.0",
   "private": true,
-  "scripts": {
-    "dev": "concurrently \"pnpm dev:backend\" \"pnpm dev:frontend\"",
-    "dev:backend": "pnpm -C backend dev",
-    "dev:frontend": "pnpm -C frontend dev",
-    "build": "pnpm -C frontend build",
-    "start": "pnpm -C backend start"
+  "description": "LinClaw - 集成七牛云 AI 大模型广场的 OpenClaw 可视化管理面板",
+  "type": "module",
+  "author": "qingchencloud",
+  "license": "MIT",
+  "homepage": "https://github.com/sunqirui1987/linclaw",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sunqirui1987/linclaw.git"
   },
+  "bugs": {
+    "url": "https://github.com/sunqirui1987/linclaw/issues"
+  },
+  "keywords": [
+    "openclaw",
+    "ai-agent",
+    "management-panel"
+  ],
+  "scripts": {
+    "dev": "node scripts/run-vite.js",
+    "build": "vite build",
+    "build:go": "go build ./src-go/cmd/linclawd",
+    "preview": "vite preview",
+    "release": "bash scripts/release.sh",
+    "serve": "go run ./src-go/cmd/linclawd --port 1420 --web-root dist",
+    "serve:go": "go run ./src-go/cmd/linclawd --port 43187 --web-root dist",
+    "server:go": "npm run serve:go",
+    "serve:go:web": "go run ./src-go/cmd/linclawd --port 1420 --web-root dist",
+    "test:go": "go test ./src-go/...",
+    "version:sync": "node scripts/sync-version.js",
+    "version:set": "node scripts/sync-version.js"
+  },
+  "dependencies": {},
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "vite": "^6.3.5"
   }
 }

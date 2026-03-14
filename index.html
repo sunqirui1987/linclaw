@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LinClaw</title>
+  <link rel="icon" href="/favicon.ico">
+  <!-- 样式由 main.js 通过 Vite 统一加载 -->
+  <style>
+    /* 启动加载屏（内联，零依赖，立即渲染） */
+    #splash {
+      position: fixed; inset: 0; z-index: 99999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background:
+        radial-gradient(circle at top, rgba(15, 118, 110, 0.18), transparent 28%),
+        radial-gradient(circle at bottom left, rgba(201, 119, 50, 0.14), transparent 24%),
+        #f4efe6;
+      transition: opacity 0.4s ease, visibility 0.4s ease;
+    }
+    @media (prefers-color-scheme: dark) {
+      #splash {
+        background:
+          radial-gradient(circle at top, rgba(79, 209, 197, 0.16), transparent 26%),
+          radial-gradient(circle at bottom left, rgba(240, 171, 99, 0.12), transparent 24%),
+          #0f1718;
+      }
+    }
+    #splash.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+    #splash .sp-logo {
+      width: 56px; height: 56px; margin-bottom: 20px;
+      color: #0f766e; animation: sp-pulse 2s ease-in-out infinite;
+    }
+    #splash .sp-name {
+      font-family: "Avenir Next", "Segoe UI Variable", "PingFang SC", sans-serif;
+      font-size: 24px; font-weight: 700; letter-spacing: 0.08em;
+      color: #1f312f; margin-bottom: 6px;
+    }
+    #splash .sp-tag {
+      font-family: "Avenir Next", "Segoe UI Variable", "PingFang SC", sans-serif;
+      font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase;
+      color: #c97732; margin-bottom: 24px;
+    }
+    @media (prefers-color-scheme: dark) {
+      #splash .sp-name { color: #edf6f3; }
+      #splash .sp-tag { color: #f0ab63; }
+    }
+    #splash .sp-bar {
+      width: 120px; height: 3px; border-radius: 2px; overflow: hidden;
+      background: rgba(15, 118, 110, 0.15);
+    }
+    #splash .sp-bar-inner {
+      width: 40%; height: 100%; border-radius: 2px;
+      background: linear-gradient(90deg, #0f766e, #c97732);
+      animation: sp-slide 1.2s ease-in-out infinite;
+    }
+    #splash .sp-site {
+      margin-top: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 12px; color: #a1a1aa; letter-spacing: 0.3px;
+    }
+    #splash .sp-site a {
+      color: #0f766e; text-decoration: none;
+    }
+    #splash .sp-site a:hover { text-decoration: underline; }
+    @keyframes sp-slide {
+      0% { transform: translateX(-100%); }
+      50% { transform: translateX(200%); }
+      100% { transform: translateX(-100%); }
+    }
+    @keyframes sp-pulse {
+      0%, 100% { opacity: 0.7; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.05); }
+    }
+  </style>
+</head>
+<body>
+  <!-- 启动加载屏 -->
+  <div id="splash">
+    <svg class="sp-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+      <path d="M18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/>
+    </svg>
+    <div class="sp-name">LinClaw</div>
+    <div class="sp-tag">Control Deck</div>
+    <div class="sp-bar"><div class="sp-bar-inner"></div></div>
+    <div class="sp-site"><a href="https://linclaw.qnlinking.com/" target="_blank">https://linclaw.qnlinking.com/</a></div>
+  </div>
+  <script>setTimeout(function(){var s=document.getElementById('splash');if(s){s.classList.add('hide');setTimeout(function(){s.remove()},500)}},6000)</script>
+
+  <div id="app">
+    <aside id="sidebar"></aside>
+    <div id="main-col">
+      <div id="update-banner" class="update-banner update-banner-hidden"></div>
+      <div id="gw-banner" class="gw-banner gw-banner-hidden"></div>
+      <main id="content"></main>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

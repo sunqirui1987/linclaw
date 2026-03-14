@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用文档
+    url: https://github.com/sunqirui1987/linclaw/blob/main/README.md
+    about: 先查看 README 中的开发、部署、发布说明。
+  - name: 发布页
+    url: https://github.com/sunqirui1987/linclaw/releases
+    about: 下载现成发布包，或核对当前版本资产。

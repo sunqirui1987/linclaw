@@ -1,0 +1,121 @@
+/* Light theme */
+:root, [data-theme="light"] {
+  --bg-primary: #f4efe6;
+  --bg-secondary: rgba(255, 251, 245, 0.9);
+  --bg-tertiary: #e8dece;
+  --bg-card: rgba(255, 252, 246, 0.82);
+  --bg-card-hover: rgba(255, 253, 249, 0.96);
+  --bg-glass: rgba(255, 255, 255, 0.46);
+  --bg-glass-hover: rgba(255, 255, 255, 0.72);
+
+  --border-primary: rgba(40, 63, 60, 0.14);
+  --border-secondary: rgba(40, 63, 60, 0.08);
+  --border-focus: rgba(15, 118, 110, 0.34);
+
+  --text-primary: #1f312f;
+  --text-secondary: #476360;
+  --text-tertiary: #7a8f8b;
+  --text-inverse: #f8f5ef;
+
+  --accent: #0f766e;
+  --accent-hover: #115e59;
+  --accent-muted: rgba(15, 118, 110, 0.12);
+  --accent-contrast: #f7ebdd;
+  --brand-signal: #c97732;
+  --brand-signal-muted: rgba(201, 119, 50, 0.12);
+
+  --primary: var(--accent);
+  --primary-bg: rgba(15, 118, 110, 0.1);
+
+  --success: #167c57;
+  --success-muted: rgba(22, 124, 87, 0.12);
+  --warning: #b76c1f;
+  --warning-muted: rgba(183, 108, 31, 0.14);
+  --error: #c74d3b;
+  --error-muted: rgba(199, 77, 59, 0.12);
+  --info: #216b8d;
+  --info-muted: rgba(33, 107, 141, 0.12);
+
+  --shadow-sm: 0 10px 22px rgba(42, 40, 33, 0.05);
+  --shadow-md: 0 18px 36px rgba(42, 40, 33, 0.09);
+  --shadow-lg: 0 30px 60px rgba(42, 40, 33, 0.14);
+  --shadow-glow: 0 0 40px rgba(15, 118, 110, 0.12);
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+  --bg-primary: #0f1718;
+  --bg-secondary: rgba(17, 28, 30, 0.92);
+  --bg-tertiary: #1a2729;
+  --bg-card: rgba(19, 33, 35, 0.82);
+  --bg-card-hover: rgba(26, 42, 44, 0.94);
+  --bg-glass: rgba(255, 255, 255, 0.05);
+  --bg-glass-hover: rgba(255, 255, 255, 0.1);
+
+  --border-primary: rgba(126, 167, 160, 0.16);
+  --border-secondary: rgba(126, 167, 160, 0.08);
+  --border-focus: rgba(74, 222, 208, 0.32);
+
+  --text-primary: #edf6f3;
+  --text-secondary: #abc1bc;
+  --text-tertiary: #6e8883;
+  --text-inverse: #0f1718;
+
+  --accent: #4fd1c5;
+  --accent-hover: #87e7dd;
+  --accent-muted: rgba(79, 209, 197, 0.14);
+  --accent-contrast: #173331;
+  --brand-signal: #f0ab63;
+  --brand-signal-muted: rgba(240, 171, 99, 0.16);
+
+  --primary: var(--accent);
+  --primary-bg: rgba(79, 209, 197, 0.14);
+
+  --success: #4ade80;
+  --success-muted: rgba(74, 222, 128, 0.16);
+  --warning: #f6ad55;
+  --warning-muted: rgba(246, 173, 85, 0.16);
+  --error: #f87171;
+  --error-muted: rgba(248, 113, 113, 0.16);
+  --info: #63b3ed;
+  --info-muted: rgba(99, 179, 237, 0.16);
+
+  --shadow-sm: 0 12px 22px rgba(0, 0, 0, 0.22);
+  --shadow-md: 0 22px 44px rgba(0, 0, 0, 0.28);
+  --shadow-lg: 0 34px 72px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 42px rgba(79, 209, 197, 0.16);
+}
+
+/* Shared tokens */
+:root {
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  --font-sans: "Avenir Next", "Segoe UI Variable", "PingFang SC", "Noto Sans SC", sans-serif;
+  --font-display: "Avenir Next", "Trebuchet MS", "PingFang SC", sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", "Fira Code", monospace;
+  --font-size-xs: 11px;
+  --font-size-sm: 13px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 22px;
+  --font-size-2xl: 28px;
+
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+  --transition-slow: 350ms ease;
+
+  --sidebar-width: 268px;
+  --sidebar-collapsed: 60px;
+  --header-height: 78px;
+}

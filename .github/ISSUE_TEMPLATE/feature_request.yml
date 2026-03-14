@@ -1,0 +1,71 @@
+name: Feature Request
+description: 提出面向 Web + Go 架构的新能力、优化建议或工作流改进
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        欢迎提出建议。
+
+        为了方便我们判断优先级，请尽量说明业务场景、当前痛点，以及它更偏前端、Go 后端、部署还是发布流程。
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 需求概述
+      placeholder: 我希望 LinClaw 支持 ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 主要影响范围
+      options:
+        - 前端页面 / 交互
+        - Go API / 命令层
+        - Gateway / 服务生命周期
+        - 配置 / 迁移 / 兼容
+        - 远程实例
+        - 部署 / 发布 / CI
+        - 文档 / 上手体验
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 当前问题
+      description: 没有这个能力时，你现在遇到什么阻碍？
+      placeholder: 现在必须手动 ...，导致 ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 期望方案
+      description: 说说你理想中的行为、入口或流程。
+      placeholder: 我期望在 ... 页面/命令中，能够 ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 替代方案或折中方案
+      placeholder: 如果完整方案太重，也可以先支持 ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 补充背景
+      description: 可以贴原型、截图、参考产品、接口文档或发布流程需求。
+      placeholder: 参考链接 / 截图 / API 文档 / CI 需求 ...
+    validations:
+      required: false
