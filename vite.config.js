@@ -41,6 +41,13 @@ export default defineConfig({
           proxy.on('error', () => {})
         },
       },
+      '/v1': {
+        target: goApiTarget,
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('error', () => {})
+        },
+      },
     },
   },
   envPrefix: ['VITE_'],

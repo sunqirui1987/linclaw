@@ -130,6 +130,43 @@ func TestOpenAIModelsEndpointRequiresBearerAuth(t *testing.T) {
 	})
 }
 
+func TestOpenAIStatusAutofillsDefaults(t *testing.T) {
+	server := newTestServer(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/__api/openai_adapter_status", strings.NewReader("{}"))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if enabled, _ := payload["enabled"].(bool); !enabled {
+		t.Fatalf("expected enabled by default, got %#v", payload["enabled"])
+	}
+	if key, _ := payload["apiKey"].(string); strings.TrimSpace(key) == "" {
+		t.Fatalf("expected generated api key, got %#v", payload["apiKey"])
+	}
+
+	panelConfig, err := server.app.Store.ReadPanelConfig()
+	if err != nil {
+		t.Fatalf("read panel config: %v", err)
+	}
+	openaiConfig, _ := panelConfig["openaiAdapter"].(map[string]any)
+	if openaiConfig == nil {
+		t.Fatalf("expected openaiAdapter to be persisted")
+	}
+	if modelID, _ := openaiConfig["modelId"].(string); modelID != "xiaolongxia" {
+		t.Fatalf("unexpected modelId: %#v", openaiConfig["modelId"])
+	}
+}
+
 func TestOpenAIChatCompletionsRewritesModelAndInjectsPrompt(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Authorization"); got != "Bearer upstream-secret" {

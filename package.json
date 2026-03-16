@@ -24,6 +24,7 @@
     "dev": "node scripts/run-vite.js",
     "build": "vite build",
     "build:go": "go build ./src-go/cmd/linclawd",
+    "electron:Dev": "npm run electron:dev",
     "electron:dev": "node scripts/electron-dev.mjs",
     "electron:build": "node scripts/build-electron-assets.mjs",
     "electron:pack": "npm run electron:build && electron-builder --dir",
