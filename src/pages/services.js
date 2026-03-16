@@ -168,7 +168,7 @@ async function loadRegistry(page) {
 async function loadServices(page) {
   const container = page.querySelector('#services-list')
   try {
-    const services = await api.getServicesStatus()
+    const services = await api.getServicesStatus(true)
     syncGatewayStatus(services)
     renderServices(container, services)
   } catch (e) {
@@ -411,7 +411,7 @@ async function handleServiceAction(action, label, page) {
 
     // 检查实际状态
     try {
-      const services = await api.getServicesStatus()
+      const services = await api.getServicesStatus(true)
       const svc = label === 'ai.openclaw.gateway'
         ? syncGatewayStatus(services)
         : services?.find?.(s => s.label === label) || services?.[0]

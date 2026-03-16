@@ -1,6 +1,6 @@
 /**
  * AI 助手页面
- * 独立模型配置，不依赖 OpenClaw
+ * 复用模型配置中的七牛云 API Key，助手模型可单独选择
  * 支持：流式响应、Markdown 渲染、会话管理、日志分析、上下文注入
  */
 import { renderMarkdown } from '../lib/markdown.js'
@@ -82,7 +82,7 @@ function requiresApiKey() {
 }
 
 function apiHintText() {
-  return `LinClaw 只保留七牛云模型接入。Base URL 固定为 ${QINIU.baseUrl}，模型列表从 ${QINIU.modelsUrl} 拉取。`
+  return `LinClaw 只保留七牛云模型接入。Base URL 固定为 ${QINIU.baseUrl}，API Key 自动复用「模型配置」页，模型列表从 ${QINIU.modelsUrl} 拉取。`
 }
 
 function apiBasePlaceholder() {
@@ -90,7 +90,7 @@ function apiBasePlaceholder() {
 }
 
 function apiKeyPlaceholder() {
-  return '输入七牛云 API Key'
+  return '自动复用模型配置页中的七牛云 API Key'
 }
 
 // ── 系统提示词 ──
@@ -1352,13 +1352,55 @@ function loadConfig() {
   if (!_config.mode) _config.mode = DEFAULT_MODE
   _config.baseUrl = QINIU.baseUrl
   _config.apiType = QINIU.apiType
+  _config.apiKey = ''
   if (_config.autoRounds === undefined) _config.autoRounds = 8
   if (!Array.isArray(_config.knowledgeFiles)) _config.knowledgeFiles = []
   return _config
 }
 
 function saveConfig() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(_config))
+  const next = { ..._config }
+  delete next.apiKey
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+}
+
+function getQiniuProviderFromOpenClawConfig(config) {
+  const providers = config?.models?.providers || {}
+  for (const [pid, provider] of Object.entries(providers)) {
+    if (isQiniuProviderEntry(pid, provider)) {
+      return {
+        source: '模型配置',
+        name: QINIU.providerKey,
+        baseUrl: QINIU.baseUrl,
+        apiKey: String(provider?.apiKey || '').trim(),
+        apiType: QINIU.apiType,
+        models: Array.isArray(provider?.models)
+          ? provider.models.map(model => (typeof model === 'string' ? model : model?.id || model?.name)).filter(Boolean)
+          : [],
+      }
+    }
+  }
+  return null
+}
+
+async function syncAssistantApiKeyFromModelConfig() {
+  try {
+    const config = await api.readOpenclawConfig()
+    const provider = getQiniuProviderFromOpenClawConfig(config)
+    const nextApiKey = provider?.apiKey || ''
+    const changed = _config.apiKey !== nextApiKey
+    _config.baseUrl = QINIU.baseUrl
+    _config.apiType = QINIU.apiType
+    _config.apiKey = nextApiKey
+    if (changed) saveConfig()
+    return provider
+  } catch (err) {
+    console.warn('读取模型配置中的七牛云 API Key 失败:', err)
+    _config.baseUrl = QINIU.baseUrl
+    _config.apiType = QINIU.apiType
+    _config.apiKey = ''
+    return null
+  }
 }
 
 // ── 会话管理 ──
@@ -1485,9 +1527,10 @@ const TIMEOUT_CHUNK = 30_000     // 流式 chunk 间隔超时 30 秒
 const TIMEOUT_CONNECT = 30_000   // 连接超时 30 秒
 
 async function callAI(messages, onChunk) {
+  await syncAssistantApiKeyFromModelConfig()
   const apiType = normalizeApiType(_config.apiType)
   if (!_config.baseUrl || !_config.model || (requiresApiKey(apiType) && !_config.apiKey)) {
-    throw new Error('请先配置 AI 模型（点击右上角设置按钮）')
+    throw new Error('请先在「模型配置」页填写七牛云 API Key，并在右上角设置里选择助手模型')
   }
 
   const base = cleanBaseUrl(_config.baseUrl, apiType)
@@ -2061,9 +2104,10 @@ async function executeToolWithSafety(toolName, args, tcForConfirm) {
 
 // 带工具调用的 AI 请求（非流式，用于 tool_calls 检测循环）
 async function callAIWithTools(messages, onStatus, onToolProgress) {
+  await syncAssistantApiKeyFromModelConfig()
   const apiType = normalizeApiType(_config.apiType)
   if (!_config.baseUrl || !_config.model || (requiresApiKey(apiType) && !_config.apiKey)) {
-    throw new Error('请先配置 AI 模型（点击右上角设置按钮）')
+    throw new Error('请先在「模型配置」页填写七牛云 API Key，并在右上角设置里选择助手模型')
   }
 
   const base = cleanBaseUrl(_config.baseUrl, apiType)
@@ -2539,7 +2583,8 @@ function buildTestResult({ success, elapsed, usedApi, reqUrl, reqBody, respStatu
   return html
 }
 
-function showSettings() {
+async function showSettings() {
+  const sharedProvider = await syncAssistantApiKeyFromModelConfig()
   const c = _config
   const overlay = document.createElement('div')
   overlay.className = 'modal-overlay'
@@ -2570,14 +2615,15 @@ function showSettings() {
           <div style="display:flex;gap:10px;align-items:flex-end">
             <div class="form-group" style="flex:1;margin-bottom:0">
               <label class="form-label">七牛云 API Key</label>
-              <input class="form-input" id="ast-apikey" type="password" value="${escHtml(c.apiKey)}" placeholder="${escHtml(apiKeyPlaceholder(c.apiType))}">
+              <input class="form-input" id="ast-apikey" type="password" value="${escHtml(c.apiKey)}" placeholder="${escHtml(apiKeyPlaceholder(c.apiType))}" readonly>
             </div>
             <div style="display:flex;gap:6px;padding-bottom:1px">
               <button class="btn btn-sm btn-secondary" id="ast-btn-test" title="测试连通性">测试</button>
               <button class="btn btn-sm btn-secondary" id="ast-btn-models" title="从七牛云官方接口获取可用模型">拉取</button>
-              <button class="btn btn-sm btn-secondary" id="ast-btn-import" title="从 OpenClaw 导入七牛云配置">${icon('download', 14)} 导入</button>
+              <button class="btn btn-sm btn-secondary" id="ast-btn-import" title="同步模型配置中的七牛云 API Key">${icon('refresh-cw', 14)} 同步</button>
             </div>
           </div>
+          <div class="form-hint" style="margin-top:6px">这里会自动复用「模型配置」页中的七牛云 API Key，如需修改请前往模型配置。</div>
           <div id="ast-test-result" style="margin:6px 0 2px;font-size:12px;min-height:16px"></div>
           <div style="display:flex;gap:10px;align-items:flex-end">
             <div class="form-group" style="flex:1">
@@ -2601,7 +2647,7 @@ function showSettings() {
                 <span style="font-weight:700;font-size:14px;letter-spacing:0.2px">七牛云官方模型列表</span>
               </div>
               <div style="font-size:12px;color:rgba(255,255,255,0.78);line-height:1.7">
-                AI 助手配置也已统一为七牛云。点击「拉取」会从官方接口获取模型列表，保存后助手将始终使用七牛云 API Key 与模型。
+                AI 助手配置也已统一为七牛云。点击「拉取」会从官方接口获取模型列表，助手会自动复用「模型配置」页中的七牛云 API Key。
               </div>
               <div style="margin-top:10px;font-size:11px;color:rgba(255,255,255,0.82);display:flex;gap:12px;flex-wrap:wrap">
                 <a href="${QINIU.squareUrl}" target="_blank" style="color:#fff;text-decoration:none">${icon('globe', 12)} 模型广场</a>
@@ -2978,17 +3024,23 @@ function showSettings() {
   }
 
   renderModelOptions([], '')
-  loadQiniuModels({ showStatus: false, preferredModel: c.model, extraModels: c.model ? [c.model] : [] })
+  loadQiniuModels({
+    showStatus: false,
+    preferredModel: c.model,
+    extraModels: [...(sharedProvider?.models || []), ...(c.model ? [c.model] : [])],
+  })
 
   // 测试对话：真实发一条消息，显示完整请求/响应参数
   overlay.querySelector('#ast-btn-test').onclick = async (e) => {
-    const btn = e.target
+    const btn = e.target.closest('button')
     const baseUrl = QINIU.baseUrl
-    const apiKey = overlay.querySelector('#ast-apikey').value.trim()
+    const provider = await syncAssistantApiKeyFromModelConfig()
+    overlay.querySelector('#ast-apikey').value = provider?.apiKey || ''
+    const apiKey = provider?.apiKey || ''
     const model = overlay.querySelector('#ast-model').value.trim()
     const selApiType = QINIU.apiType
     if (!apiKey) {
-      resultEl.innerHTML = '<span style="color:var(--warning)">请先填写七牛云 API Key</span>'
+      resultEl.innerHTML = '<span style="color:var(--warning)">请先在模型配置页填写七牛云 API Key</span>'
       return
     }
     if (!model) {
@@ -3086,7 +3138,7 @@ function showSettings() {
     }
   }
 
-  // 从 OpenClaw 导入模型配置
+  // 同步模型配置中的七牛云 API Key
   const applyImportedProvider = async (provider) => {
     overlay.querySelector('#ast-baseurl').value = QINIU.baseUrl
     overlay.querySelector('#ast-apikey').value = provider.apiKey
@@ -3104,118 +3156,43 @@ function showSettings() {
     if (mergedSelected) selectedModel = mergedSelected
 
     if (selectedModel && preferredImportedModel && selectedModel === preferredImportedModel) {
-      resultEl.innerHTML = '<span style="color:var(--success)">✓ 已导入七牛云配置，并保留导入模型：' + escHtml(selectedModel) + '</span>'
+      resultEl.innerHTML = '<span style="color:var(--success)">✓ 已同步模型配置，并保留当前模型：' + escHtml(selectedModel) + '</span>'
       return
     }
     if (selectedModel && officialModels.length > 0) {
-      resultEl.innerHTML = '<span style="color:var(--success)">✓ 已导入七牛云配置，并默认选择第一个官方模型：' + escHtml(selectedModel) + '</span>'
+      resultEl.innerHTML = '<span style="color:var(--success)">✓ 已同步模型配置，并默认选择第一个官方模型：' + escHtml(selectedModel) + '</span>'
       return
     }
     if (selectedModel) {
-      resultEl.innerHTML = '<span style="color:var(--success)">✓ 已导入七牛云配置，并默认选择第一个导入模型：' + escHtml(selectedModel) + '</span>'
+      resultEl.innerHTML = '<span style="color:var(--success)">✓ 已同步模型配置，并默认选择第一个同步模型：' + escHtml(selectedModel) + '</span>'
       return
     }
-    resultEl.innerHTML = '<span style="color:var(--warning)">已导入七牛云配置，但未发现可用模型，请点击「拉取」同步官方模型列表。</span>'
+    resultEl.innerHTML = '<span style="color:var(--warning)">已同步模型配置，但未发现可用模型，请点击「拉取」同步官方模型列表。</span>'
   }
 
   overlay.querySelector('#ast-btn-import').onclick = async (e) => {
-    const btn = e.target
+    const btn = e.target.closest('button')
     btn.disabled = true
-    btn.textContent = '扫描中...'
-    resultEl.innerHTML = '<span style="color:var(--text-tertiary)">正在扫描 OpenClaw 七牛云模型配置...</span>'
+    btn.textContent = '同步中...'
+    resultEl.innerHTML = '<span style="color:var(--text-tertiary)">正在同步模型配置中的七牛云 API Key...</span>'
 
     try {
-      const sysInfo = await api.assistantSystemInfo()
-      const home = sysInfo.match(/主目录[:：]\s*(.+)/)?.[1]?.trim() || sysInfo.match(/Home[:：]\s*(.+)/)?.[1]?.trim() || ''
-      if (!home) throw new Error('无法获取主目录路径')
-
-      const providers = []
-
-      // 扫描 agents/*/agent/models.json
-      try {
-        const agentsList = await api.assistantListDir(home + '/.openclaw/agents')
-        const agentIds = agentsList.split('\n').map(l => l.replace(/\/$/, '').trim()).filter(Boolean)
-        for (const agentId of agentIds) {
-          try {
-            const raw = await api.assistantReadFile(home + '/.openclaw/agents/' + agentId + '/agent/models.json')
-            const data = JSON.parse(raw)
-            for (const [pid, p] of Object.entries(data.providers || {})) {
-              if (isQiniuProviderEntry(pid, p)) {
-                providers.push({
-                  source: 'Agent: ' + agentId,
-                  name: QINIU.providerKey,
-                  baseUrl: QINIU.baseUrl,
-                  apiKey: p.apiKey || '',
-                  apiType: QINIU.apiType,
-                  models: (p.models || []).map(m => m.id || m.name).filter(Boolean),
-                })
-              }
-            }
-          } catch {}
-        }
-      } catch {}
-
-      // 扫描全局 openclaw.json
-      try {
-        const raw = await api.assistantReadFile(home + '/.openclaw/openclaw.json')
-        const config = JSON.parse(raw)
-        for (const [pid, p] of Object.entries(config.models?.providers || {})) {
-          if (isQiniuProviderEntry(pid, p) && !providers.find(x => x.source === '全局配置')) {
-            providers.push({
-              source: '全局配置',
-              name: QINIU.providerKey,
-              baseUrl: QINIU.baseUrl,
-              apiKey: p.apiKey || '',
-              apiType: QINIU.apiType,
-              models: (p.models || []).map(m => m.id || m.name).filter(Boolean),
-            })
-          }
-        }
-      } catch {}
-
-      if (providers.length === 0) {
+      const provider = await syncAssistantApiKeyFromModelConfig()
+      overlay.querySelector('#ast-apikey').value = provider?.apiKey || ''
+      if (!provider) {
         resultEl.innerHTML = '<span style="color:var(--warning)">未发现七牛云模型配置。请先在模型配置页填写七牛云 API Key 并同步模型列表。</span>'
         return
       }
-      if (providers.length === 1) {
-        await applyImportedProvider(providers[0])
+      if (!provider.apiKey) {
+        resultEl.innerHTML = '<span style="color:var(--warning)">模型配置页还没有七牛云 API Key，请先去模型配置页填写。</span>'
         return
       }
-
-      // 构建选择 UI
-      const listHtml = providers.map((p, i) => {
-        const modelsStr = p.models.length ? p.models.join(', ') : '(无模型列表)'
-        return `<div class="ast-import-option" data-idx="${i}" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;transition:background 0.15s">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <strong>${escHtml(p.name)}</strong>
-            <span style="font-size:11px;color:var(--text-tertiary)">${escHtml(p.source)}</span>
-          </div>
-          <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">${escHtml(p.baseUrl)}</div>
-          <div style="font-size:11px;color:var(--text-tertiary);margin-top:1px">模型: ${escHtml(modelsStr)}</div>
-        </div>`
-      }).join('')
-
-      resultEl.innerHTML = `<div style="margin-top:4px">
-        <div style="font-size:12px;font-weight:600;margin-bottom:6px">检测到 ${providers.length} 份七牛云配置，点击选择：</div>
-        ${listHtml}
-      </div>`
-
-      // 点击选择后填充
-      resultEl.querySelectorAll('.ast-import-option').forEach(el => {
-        el.addEventListener('mouseenter', () => el.style.background = 'var(--bg-secondary)')
-        el.addEventListener('mouseleave', () => el.style.background = '')
-        el.addEventListener('click', async () => {
-          const p = providers[parseInt(el.dataset.idx)]
-          resultEl.innerHTML = '<span style="color:var(--text-tertiary)">正在导入七牛云配置...</span>'
-          await applyImportedProvider(p)
-        })
-      })
-
+      await applyImportedProvider(provider)
     } catch (err) {
-      resultEl.innerHTML = '<span style="color:var(--error)">导入失败: ' + escHtml(err.message || String(err)) + '</span>'
+      resultEl.innerHTML = '<span style="color:var(--error)">同步失败: ' + escHtml(err.message || String(err)) + '</span>'
     } finally {
       btn.disabled = false
-      btn.innerHTML = `${icon('download', 14)} 导入`
+      btn.innerHTML = `${icon('refresh-cw', 14)} 同步`
     }
   }
 
@@ -3224,11 +3201,13 @@ function showSettings() {
   })
 
   overlay.querySelector('[data-action="cancel"]').onclick = () => overlay.remove()
-  overlay.querySelector('[data-action="confirm"]').onclick = () => {
+  overlay.querySelector('[data-action="confirm"]').onclick = async () => {
+    const provider = await syncAssistantApiKeyFromModelConfig()
+    overlay.querySelector('#ast-apikey').value = provider?.apiKey || ''
     _config.assistantName = overlay.querySelector('#ast-name').value.trim() || DEFAULT_NAME
     _config.assistantPersonality = overlay.querySelector('#ast-personality').value.trim() || DEFAULT_PERSONALITY
     _config.baseUrl = QINIU.baseUrl
-    _config.apiKey = overlay.querySelector('#ast-apikey').value.trim()
+    _config.apiKey = provider?.apiKey || ''
     _config.model = overlay.querySelector('#ast-model').value.trim()
     _config.temperature = parseFloat(overlay.querySelector('#ast-temp').value) || 0.7
     _config.apiType = QINIU.apiType
@@ -3697,7 +3676,7 @@ function getAssistantGuideHtml() {
     <div class="ast-page-guide" id="ast-page-guide">
       <div class="ast-guide-badge">内置 AI</div>
       <div class="ast-guide-text">
-        <b>这是 LinClaw 内置的 AI 助手</b>，独立于 OpenClaw，使用你在右上角「设置」中配置的 API。
+        <b>这是 LinClaw 内置的 AI 助手</b>，会话独立于 OpenClaw，但会自动复用「模型配置」页中的七牛云 API Key。
         <span style="opacity:0.6">如需与 OpenClaw Agent 对话，请前往「实时聊天」页面。</span>
       </div>
       <button class="ast-guide-close" onclick="localStorage.setItem('${AST_GUIDE_KEY}','1');this.closest('.ast-page-guide').remove()">&times;</button>
@@ -3723,6 +3702,7 @@ function stopIcon() {
 // ── 页面渲染 ──
 export async function render() {
   loadConfig()
+  await syncAssistantApiKeyFromModelConfig()
   loadSessions()
 
   // 确保数据目录存在（~/.openclaw/linclaw/images/ 等）
@@ -3779,7 +3759,7 @@ export async function render() {
           <textarea class="ast-textarea" id="ast-textarea" placeholder="描述你的问题，粘贴日志、截图或错误信息..." rows="1"></textarea>
           <button class="ast-send-btn" id="ast-send-btn" title="发送">${sendIcon()}</button>
         </div>
-        <div class="ast-input-hint">Enter 发送 · Shift+Enter 换行 · 支持粘贴/拖拽图片 · AI 助手独立于 OpenClaw</div>
+        <div class="ast-input-hint">Enter 发送 · Shift+Enter 换行 · 支持粘贴/拖拽图片 · 会话独立于 OpenClaw，API Key 复用模型配置</div>
       </div>
     </div>
   `
@@ -3989,7 +3969,7 @@ export async function render() {
   })
 
   // 设置
-  page.querySelector('#ast-btn-settings').addEventListener('click', showSettings)
+  page.querySelector('#ast-btn-settings').addEventListener('click', () => { void showSettings() })
 
   // 会话列表事件委托
   _sessionListEl.addEventListener('click', (e) => {

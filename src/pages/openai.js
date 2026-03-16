@@ -5,6 +5,7 @@ import { icon } from '../lib/icons.js'
 import { renderMarkdown } from '../lib/markdown.js'
 
 const TAB_STORAGE_KEY = 'linclaw-openai-tab'
+const CHAT_STORAGE_KEY = 'linclaw-openai-chat-history'
 const DEFAULT_MODEL_ID = 'xiaolongxia'
 const DEFAULT_ASSISTANT_NAME = '小龙虾'
 const EXAMPLE_PROMPTS = [
@@ -27,17 +28,24 @@ export async function render() {
     <style>
       .openai-page {
         max-width: 1320px;
+        overflow-x: hidden;
+      }
+      .openai-page.openai-page-test-mode {
         height: calc(100vh - 110px);
-        overflow: hidden;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
+        overscroll-behavior: contain;
         display: flex;
         flex-direction: column;
       }
       .openai-shell {
-        flex: 1;
-        min-height: 0;
         display: flex;
         flex-direction: column;
         gap: var(--space-lg);
+      }
+      .openai-page.openai-page-test-mode .openai-shell {
+        flex: 1;
+        min-height: 0;
       }
       .openai-hero {
         display: flex;
@@ -82,20 +90,33 @@ export async function render() {
       }
       .openai-panel.active {
         display: block;
+      }
+      .openai-page.openai-page-test-mode .openai-panel.active {
         flex: 1;
         min-height: 0;
       }
       .openai-simple-layout {
-        height: 100%;
-        min-height: 0;
         display: grid;
         grid-template-columns: minmax(0, 1fr) 320px;
         gap: var(--space-lg);
+        align-items: start;
+      }
+      .openai-page.openai-page-test-mode .openai-simple-layout {
+        height: 100%;
+        min-height: 0;
+        align-items: stretch;
       }
       .openai-quickstart {
         display: flex;
         flex-direction: column;
         gap: var(--space-md);
+      }
+      .openai-page.openai-page-test-mode .openai-quickstart {
+        min-height: 0;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
+        overscroll-behavior: contain;
+        padding-right: 4px;
       }
       .openai-guide-card {
         padding: 20px 22px;
@@ -201,10 +222,16 @@ export async function render() {
         font-size: var(--font-size-sm);
       }
       .openai-side-card {
-        min-height: 0;
         display: flex;
         flex-direction: column;
         gap: var(--space-md);
+      }
+      .openai-page.openai-page-test-mode .openai-side-card {
+        min-height: 0;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
+        overscroll-behavior: contain;
+        padding-right: 4px;
       }
       .openai-side-card .btn {
         width: 100%;
@@ -243,17 +270,27 @@ export async function render() {
         margin-top: 12px;
       }
       .openai-test-layout {
-        height: 100%;
-        min-height: 0;
         display: grid;
         grid-template-columns: 300px minmax(0, 1fr);
         gap: var(--space-lg);
+        align-items: start;
+      }
+      .openai-page.openai-page-test-mode .openai-test-layout {
+        height: 100%;
+        min-height: 0;
+        align-items: stretch;
       }
       .openai-test-card {
-        min-height: 0;
         display: flex;
         flex-direction: column;
         gap: var(--space-md);
+      }
+      .openai-page.openai-page-test-mode .openai-test-card {
+        min-height: 0;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
+        overscroll-behavior: contain;
+        padding-right: 4px;
       }
       .openai-kv-list {
         display: flex;
@@ -305,8 +342,8 @@ export async function render() {
         background: var(--bg-card-hover);
       }
       .openai-chat-shell {
-        height: 100%;
-        min-height: 0;
+        min-height: 620px;
+        height: auto;
         display: flex;
         flex-direction: column;
         overflow: hidden;
@@ -314,6 +351,10 @@ export async function render() {
         border: 1px solid var(--border-primary);
         background: linear-gradient(180deg, rgba(255, 252, 246, 0.96), rgba(244, 239, 230, 0.96));
         box-shadow: var(--shadow-sm);
+      }
+      .openai-page.openai-page-test-mode .openai-chat-shell {
+        height: 100%;
+        min-height: 0;
       }
       .openai-chat-header {
         display: flex;
@@ -367,7 +408,7 @@ export async function render() {
         font-size: 12px;
       }
       @media (max-width: 1160px) {
-        .openai-page {
+        .openai-page.openai-page-test-mode {
           height: auto;
           overflow: visible;
         }
@@ -408,8 +449,8 @@ export async function render() {
       </div>
 
       <div class="tab-bar" id="openai-tab-bar">
-        <div class="tab" data-tab="config">灵矽接入</div>
         <div class="tab" data-tab="test">聊天测试</div>
+        <div class="tab" data-tab="config">灵矽接入</div>
       </div>
 
       <section class="openai-panel" data-panel="config">
@@ -456,7 +497,7 @@ export async function render() {
   `
 
   _page = page
-  _messages = []
+  _messages = loadMessages()
 
   bindEvents(page)
   switchTab(_activeTab)
@@ -467,6 +508,7 @@ export async function render() {
 
 export function cleanup() {
   stopStreaming(false)
+  persistMessages()
   _page = null
   _status = null
   _messages = []
@@ -673,6 +715,7 @@ function renderTestPanel() {
   })
   target.querySelector('#openai-clear-chat')?.addEventListener('click', () => {
     _messages = []
+    persistMessages()
     renderMessages()
     toast('测试会话已清空', 'success')
   })
@@ -757,6 +800,7 @@ async function sendMessage() {
   const assistantMessage = { role: 'assistant', content: '', streaming: true }
 
   _messages.push(userMessage, assistantMessage)
+  persistMessages()
   _isStreaming = true
   _abortController = new AbortController()
 
@@ -790,6 +834,7 @@ async function sendMessage() {
         const chunk = extractChunkText(event)
         if (!chunk) return
         assistantMessage.content += chunk
+        persistMessages()
         renderMessages()
       }, _abortController.signal)
     } else {
@@ -814,6 +859,7 @@ async function sendMessage() {
     assistantMessage.streaming = false
     _isStreaming = false
     _abortController = null
+    persistMessages()
     renderMessages()
     syncSendButton()
     void loadStatus()
@@ -837,6 +883,7 @@ function switchTab(tab) {
   } catch {}
 
   if (!_page) return
+  _page.classList.toggle('openai-page-test-mode', _activeTab === 'test')
   _page.querySelectorAll('#openai-tab-bar .tab').forEach((node) => {
     node.classList.toggle('active', node.dataset.tab === _activeTab)
   })
@@ -1012,6 +1059,38 @@ function fillPrompt(text) {
   switchTab('test')
 }
 
+function persistMessages() {
+  try {
+    const safeMessages = _messages
+      .filter((item) => item.role === 'user' || item.role === 'assistant')
+      .map((item) => ({
+        role: item.role,
+        content: String(item.content || ''),
+        error: item.error === true,
+      }))
+      .slice(-24)
+    sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(safeMessages))
+  } catch {}
+}
+
+function loadMessages() {
+  try {
+    const raw = sessionStorage.getItem(CHAT_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((item) => item && (item.role === 'user' || item.role === 'assistant'))
+      .map((item) => ({
+        role: item.role,
+        content: String(item.content || ''),
+        error: item.error === true,
+      }))
+  } catch {
+    return []
+  }
+}
+
 function getSuggestedPrompt() {
   const textareaValue = _page?.querySelector('#openai-chat-input')?.value?.trim()
   if (textareaValue) return textareaValue
@@ -1141,8 +1220,8 @@ function generateApiKey() {
 function loadActiveTab() {
   try {
     const stored = localStorage.getItem(TAB_STORAGE_KEY)
-    return stored === 'test' ? 'test' : 'config'
+    return stored === 'config' ? 'config' : 'test'
   } catch {
-    return 'config'
+    return 'test'
   }
 }

@@ -9,10 +9,13 @@ import { findGatewayService } from '../lib/service-status.js'
 import { runGatewayLifecycleAction } from '../lib/gateway-action.js'
 
 let _unsubGw = null
+let _activePage = null
+let _loadSeq = 0
 
 export async function render() {
   const page = document.createElement('div')
   page.className = 'page'
+  _activePage = page
 
   page.innerHTML = `
     <div class="page-header">
@@ -44,12 +47,13 @@ export async function render() {
   bindActions(page)
 
   // 异步加载数据
-  loadDashboardData(page)
+  loadDashboardData(page, { force: true })
 
   // 监听 Gateway 状态变化，自动刷新仪表盘
   if (_unsubGw) _unsubGw()
   _unsubGw = onGatewayChange(() => {
-    loadDashboardData(page)
+    if (_activePage !== page) return
+    loadDashboardData(page, { force: true })
   })
 
   return page
@@ -57,12 +61,18 @@ export async function render() {
 
 export function cleanup() {
   if (_unsubGw) { _unsubGw(); _unsubGw = null }
+  _activePage = null
+  _loadSeq++
 }
 
-async function loadDashboardData(page) {
+async function loadDashboardData(page, options = {}) {
+  const force = options.force === true
+  const seq = ++_loadSeq
+  const isStale = () => _activePage !== page || seq !== _loadSeq
+
   // 分波加载：关键数据先渲染，次要数据后填充，减少白屏等待
   const coreP = Promise.allSettled([
-    api.getServicesStatus(),
+    api.getServicesStatus(force),
     api.getVersionInfo(),
     api.readOpenclawConfig(),
     api.getStatus(),
@@ -76,6 +86,7 @@ async function loadDashboardData(page) {
 
   // 第一波：服务状态 + 版本 + 配置 → 立即渲染统计卡片
   const [servicesRes, versionRes, configRes, openaiRes] = await coreP
+  if (isStale()) return
   const services = servicesRes.status === 'fulfilled' ? servicesRes.value : []
   if (servicesRes.status === 'fulfilled') syncGatewayStatus(services)
   const version = versionRes.status === 'fulfilled' ? versionRes.value : {}
@@ -101,10 +112,12 @@ async function loadDashboardData(page) {
     if (patched) api.writeOpenclawConfig(config).catch(() => {})
   }
 
+  if (isStale()) return
   renderStatCards(page, services, version, [], config, openaiStatus)
 
   // 第二波：Agent、MCP、备份 → 更新卡片 + 渲染总览
   const [agentsRes, mcpRes, backupsRes] = await secondaryP
+  if (isStale()) return
   const agents = agentsRes.status === 'fulfilled' ? agentsRes.value : []
   const mcpConfig = mcpRes.status === 'fulfilled' ? mcpRes.value : null
   const backups = backupsRes.status === 'fulfilled' ? backupsRes.value : []
@@ -114,6 +127,7 @@ async function loadDashboardData(page) {
 
   // 第三波：日志（最低优先级）
   const logs = await logsP
+  if (isStale()) return
   renderLogs(page, logs)
 }
 
@@ -341,24 +355,23 @@ function bindActions(page) {
     if (action === 'start-gw') {
       actionBtn.disabled = true
       await runGatewayLifecycleAction('start', {
-        onSettled: async () => { await loadDashboardData(page) },
+        onSettled: async () => { await loadDashboardData(page, { force: true }) },
       })
       actionBtn.disabled = false
       actionBtn.textContent = '启动'
     }
     if (action === 'stop-gw') {
-      actionBtn.disabled = true; actionBtn.textContent = '停止中...'
-      try {
-        await api.stopService('ai.openclaw.gateway')
-        toast('Gateway 已停止', 'success')
-        setTimeout(() => loadDashboardData(page), 1500)
-      } catch (err) { toast('停止失败: ' + err, 'error') }
-      finally { actionBtn.disabled = false; actionBtn.textContent = '停止' }
+      actionBtn.disabled = true
+      await runGatewayLifecycleAction('stop', {
+        onSettled: async () => { await loadDashboardData(page, { force: true }) },
+      })
+      actionBtn.disabled = false
+      actionBtn.textContent = '停止'
     }
     if (action === 'restart-gw') {
       actionBtn.disabled = true
       await runGatewayLifecycleAction('restart', {
-        onSettled: async () => { await loadDashboardData(page) },
+        onSettled: async () => { await loadDashboardData(page, { force: true }) },
       })
       actionBtn.disabled = false
       actionBtn.textContent = '重启'
@@ -371,7 +384,7 @@ function bindActions(page) {
     btnRestart.textContent = '处理中...'
     await runGatewayLifecycleAction('restart', {
       title: '重启 Gateway',
-      onSettled: async () => { await loadDashboardData(page) },
+      onSettled: async () => { await loadDashboardData(page, { force: true }) },
     })
     btnRestart.disabled = false
     btnRestart.classList.remove('btn-loading')
@@ -402,7 +415,7 @@ function bindActions(page) {
     try {
       const res = await api.createBackup()
       toast(`已备份: ${res.name}`, 'success')
-      setTimeout(() => loadDashboardData(page), 500)
+      setTimeout(() => loadDashboardData(page, { force: true }), 500)
     } catch (e) {
       toast('备份失败: ' + e, 'error')
     } finally {
